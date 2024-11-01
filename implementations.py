@@ -75,14 +75,12 @@ class SimpleImageFactory:
 class HOG:
     def __init__(self, imageObj) -> None:
         self.images = imageObj.images
-        # print(len(self.images))
 
     def calc_gradients(self, image):
         grad_x = np.zeros(image.shape, dtype=np.float32)
         grad_y = np.zeros(image.shape, dtype=np.float32)
         image = image.astype(np.float32)
         width, height = image.shape
-        print(width, height)
         for row in range(width):
             for col in range(height):
                 # calculating grad_x
