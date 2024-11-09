@@ -85,13 +85,13 @@ class Descriptors:
     def normalize(self, histogram) -> list[float]:
         return histogram / (np.sqrt(np.sum(np.pow(histogram, 2))) + 1e-6)
 
-    def compute_hist(self, gx, gy) -> list[float]:
-        total_angle = 180
+    def compute_hist(
+        self, gx, gy, num_bins: int = 9, total_angle: int = 180
+    ) -> list[float]:
         magnitude = np.sqrt(gx**2 + gy**2)
         direction = np.arctan2(gx, gy) * (180 / np.pi)
         direction[direction < 0] += total_angle
 
-        num_bins = 9
         histogram = [0] * num_bins
         bin_width = total_angle // num_bins
         for index in range(len(direction)):
@@ -156,6 +156,7 @@ class HOG(Descriptors):
         append_value: int,
         to_append: bool,
         block: int = 8,
+        clip: int = 1000,
     ) -> list:
         self.hog = []
         block_x, block_y = (block, block)
@@ -241,6 +242,7 @@ class SIFT(Descriptors):
         append_value: int,
         to_append: bool,
         block: int = 8,
+        clip: int = 1000,
     ) -> list:
         self.sift = []
         for i, image in enumerate(self.images[:100]):
@@ -248,7 +250,7 @@ class SIFT(Descriptors):
             # first calculate all the scales using gaussian blur that detects different images.
             blurred_images = self.calc_scales(image)
             keypoints = self.detect_keypoints(blurred_images)
-            descriptors = self.descriptors(image, keypoints, block, 1000)
+            descriptors = self.descriptors(image, keypoints, block, clip)
             histogram.extend(descriptors)
             if to_append:
                 histogram.append(append_value)
@@ -290,6 +292,7 @@ class ImagePacker:
         append_label = kwargs.get("append_label", [])
         block_size = kwargs.get("block_size", 8)
         add_image_location = kwargs.get("add_image_location", True)
+        clip = kwargs.get("clip", 1000)
         value = 0
         to_append = False
         if type(append_label).__name__ == "list" and len(append_label) > 0:
@@ -299,7 +302,9 @@ class ImagePacker:
                 value = append_label[index]
             descriptor = cls(imageObj)
             _features.extend(
-                descriptor.process(add_image_location, value, to_append, block_size)
+                descriptor.process(
+                    add_image_location, value, to_append, block_size, clip
+                )
             )
         return _features
 
