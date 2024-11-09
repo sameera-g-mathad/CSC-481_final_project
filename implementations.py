@@ -162,25 +162,6 @@ class HOG(Descriptors):
                 grad_y[row, col] = up - down
         return grad_x, grad_y
 
-    # def normalize(self, histogram):
-    #     return histogram / (np.sqrt(np.sum(np.pow(histogram, 2))) + 1e-6)
-
-    # def compute_hist(self, gx, gy):
-    #     total_angle = 180
-    #     magnitude = np.sqrt(gx**2 + gy**2)
-    #     direction = np.arctan2(gx, gy) * (180 / np.pi)
-    #     direction[direction < 0] += total_angle
-
-    #     num_bins = 9
-    #     histogram = [0] * num_bins
-    #     bin_width = total_angle // num_bins
-    #     for index in range(len(direction)):
-    #         bin_number = int(direction[index] / bin_width)
-    #         bin_number %= num_bins
-    #         histogram[bin_number] += magnitude[index]
-
-    #     return self.normalize(histogram)
-
     def process(
         self,
         add_image_location: bool,
@@ -266,25 +247,6 @@ class SIFT(Descriptors):
                 constant_values=(0, 0),
             ).tolist()
         return _descriptors[:clip]
-
-    # def normalize(self, histogram) -> list[float]:
-    #     return histogram / (np.sqrt(np.sum(np.pow(histogram, 2))) + 1e-6)
-
-    # def compute_hist(self, gx, gy) -> list[float]:
-    #     total_angle = 180
-    #     magnitude = np.sqrt(gx**2 + gy**2)
-    #     direction = np.arctan2(gx, gy) * (180 / np.pi)
-    #     direction[direction < 0] += total_angle
-
-    #     num_bins = 9
-    #     histogram = [0] * num_bins
-    #     bin_width = total_angle // num_bins
-    #     for index in range(len(direction)):
-    #         bin_number = int(direction[index] / bin_width)
-    #         bin_number %= num_bins
-    #         histogram[bin_number] += magnitude[index]
-
-    #     return self.normalize(histogram)
 
     def process(
         self,
