@@ -20,17 +20,10 @@ class Image(ABC):
     def resize(self, size: int):
         pass
 
-    @abstractmethod
-    def __repr__(self):
-        pass
-
 
 class RGB(Image):
     def __init__(self):
         super().__init__()
-
-    def __repr__(self):
-        pass
 
     def resize(self, widht: int, height: int):
         pass
@@ -71,11 +64,6 @@ class Grayscale(Image):
             self.images[index] = cv.rotate(image, np.random.choice(rotations))
 
     def __repr__(self):
-        for i in range(2):
-            index = np.random.randint(0, len(self.images))
-            plt.imshow(self.images[index], cmap="gray")
-            plt.axis("off")
-            plt.show()
         return f"Grayscale - {len(self.images)} images"
 
 
@@ -172,7 +160,7 @@ class HOG(Descriptors):
         self.hog = []
         block_x, block_y = (block, block)
         for i, image in enumerate(self.images):
-            histogram = [self.location[i]] if add_image_location else []
+            histogram = []
             gx, gy = self.calc_gradients(image)
             width, height = image.shape
             for w_region in range(0, width, block_x):
@@ -216,12 +204,11 @@ class SIFT(Descriptors):
     def detect_keypoints(self, blurred_images: list[np.ndarray], threshold=0.2):
         keypoints = []
         for index in range(1, len(blurred_images) - 1):
-            # blurred_images[index + 1] = blurred_images[index + 1].astype(float) / 255
-            # blurred_images[index - 1] = blurred_images[index - 1].astype(float) / 255
             diff_of_grad_images = blurred_images[index + 1] - blurred_images[index - 1]
             diff_of_grad = (diff_of_grad_images > threshold) | (
                 diff_of_grad_images < -threshold
             )
+            diff_of_grad_images = diff_of_grad_images / 255
             for x in range(1, len(diff_of_grad_images)):
                 for y in range(1, len(diff_of_grad_images)):
                     if diff_of_grad[x, y] == 1:
@@ -257,7 +244,7 @@ class SIFT(Descriptors):
     ) -> list:
         self.sift = []
         for i, image in enumerate(self.images[:100]):
-            histogram = [self.location[i]] if add_image_location else []
+            histogram = []
             # first calculate all the scales using gaussian blur that detects different images.
             blurred_images = self.calc_scales(image)
             keypoints = self.detect_keypoints(blurred_images)
@@ -269,10 +256,27 @@ class SIFT(Descriptors):
         return self.sift
 
 
+class Display:
+    def plot(self, imageObj: list[Image], n_rows: int = 2, n_cols: int = 3):
+        fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(20, 20))
+        for i in range(n_rows):
+            for j in range(n_cols):
+                image = imageObj[i].images[j]
+                axes[i, j].imshow(image, cmap="gray")
+                axes[i, j].axis("off")
+                plt.tight_layout()
+        plt.show()
+
+
 class ImagePacker:
     def __init__(self, data: list[Image], resize: int = 200) -> None:
         self.data = []
         self.data = self.add_data(data, resize)
+
+    def __repr__(self) -> str:
+        disp = Display()
+        disp.plot(self.data, n_rows=len(self.data))
+        return f"{type(self).__name__}"
 
     def add_data(self, data: list[Image], resize):
         output = []
