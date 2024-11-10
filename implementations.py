@@ -40,7 +40,6 @@ class Grayscale(Image):
         try:
             os.chdir(filepath)
             for file in os.listdir(filepath):
-                self.location.append(f"{filepath}/{file}")
                 image = cv.imread(f"./{file}", cv.IMREAD_GRAYSCALE)
                 self.images.append(image)
 
@@ -80,14 +79,13 @@ class SimpleImageFactory:
 class Descriptors:
     def __init__(self, imageObj: Image) -> None:
         self.images = imageObj.images
-        self.location = imageObj.location
 
     def normalize(self, histogram) -> list[float]:
         return histogram / (np.sqrt(np.sum(np.pow(histogram, 2))) + 1e-6)
 
     def compute_hist(
         self, gx, gy, num_bins: int = 9, total_angle: int = 180
-    ) -> list[float]:
+    ) -> tuple[list[float], int]:
         magnitude = np.sqrt(gx**2 + gy**2)
         direction = np.arctan2(gx, gy) * (180 / np.pi)
         direction[direction < 0] += total_angle
@@ -98,16 +96,12 @@ class Descriptors:
             bin_number = int(direction[index] / bin_width)
             bin_number %= num_bins
             histogram[bin_number] += magnitude[index]
-
-        return self.normalize(histogram)
+        angle = int(np.argmax(histogram) * 10)
+        return (self.normalize(histogram), angle)
 
     @abstractmethod
     def process(
-        self,
-        add_image_location: bool,
-        append_value: int,
-        to_append: bool,
-        block: int = 8,
+        self, append_value: int, to_append: bool, block: int = 8, **kwargs
     ) -> list:
         pass
 
@@ -152,11 +146,11 @@ class HOG(Descriptors):
 
     def process(
         self,
-        add_image_location: bool,
         append_value: int,
         to_append: bool,
         block: int = 8,
         clip: int = 1000,
+        **kwargs,
     ) -> list:
         self.hog = []
         block_x, block_y = (block, block)
@@ -172,11 +166,10 @@ class HOG(Descriptors):
                     region_grad_y = gy[
                         w_region : w_region + block_x, h_region : h_region + block_y
                     ]
-                    histogram.extend(
-                        self.compute_hist(
-                            region_grad_x.flatten(), region_grad_y.flatten()
-                        )
+                    descriptors, angle = self.compute_hist(
+                        region_grad_x.flatten(), region_grad_y.flatten()
                     )
+                    histogram.extend(descriptors)
             if to_append:
                 histogram.append(append_value)
             self.hog.append(histogram)
@@ -225,8 +218,8 @@ class SIFT(Descriptors):
             window = image[abs(x - size) : x + size, abs(y - size) : y + size]
             grad_x = np.gradient(window, axis=1)
             grad_y = np.gradient(window, axis=0)
-            _descriptors.extend(self.compute_hist(np.ravel(grad_x), np.ravel(grad_y)))
-
+            desciptors, angle = self.compute_hist(np.ravel(grad_x), np.ravel(grad_y))
+            _descriptors.extend(desciptors)
         if len(_descriptors) < clip:
             _descriptors = np.pad(
                 _descriptors,
@@ -238,11 +231,11 @@ class SIFT(Descriptors):
 
     def process(
         self,
-        add_image_location: bool,
         append_value: int,
         to_append: bool,
         block: int = 8,
         clip: int = 1000,
+        **kwargs,
     ) -> list:
         self.sift = []
         for i, image in enumerate(self.images[:100]):
@@ -256,6 +249,90 @@ class SIFT(Descriptors):
                 histogram.append(append_value)
             self.sift.append(histogram)
         return self.sift
+
+
+class ORB(Descriptors):
+    def __init__(self, imageObj) -> None:
+        self.images = imageObj.images
+
+    def fast(self, image: np.ndarray, threshold: int = 30, window_size: int = 3):
+        keypoints = []
+        width, height = image.shape
+        for i in range(window_size, width - window_size):
+            for j in range(window_size, height - window_size):
+                window = image[
+                    i - window_size : i + window_size, j - window_size : j + window_size
+                ]
+                pixel = image[i, j]
+                diff = np.abs(window - pixel)
+                if np.max(diff) > threshold:
+                    keypoints.append((i, j))
+        return keypoints
+
+    def brief(self, image, keypoint, block: int = 6, samples: int = 20) -> list[float]:
+        size = block // 2
+        x, y = keypoint
+        descriptors = []
+        random_pixels = [
+            (np.random.randint(-size, size), np.random.randint(-size, size))
+            for _ in range(samples)
+        ]
+        for dx, dy in random_pixels:
+            pixel1 = image[x + dx, y + dy]
+            pixel2 = image[abs(x - dy), abs(y - dy)]
+            if pixel1 < pixel2:
+                descriptors.append(0.0)
+            else:
+                descriptors.append(1.0)
+        return descriptors
+
+    def descriptors(
+        self,
+        image,
+        keypoints: list[tuple[int, int]],
+        block,
+        clip: int,
+        brief: bool = False,
+    ):
+        size = block // 2
+        _descriptors = []
+        for x, y in keypoints:
+            window = image[abs(x - size) : x + size, abs(y - size) : y + size]
+            grad_x = np.gradient(window, axis=1)
+            grad_y = np.gradient(window, axis=0)
+            desciptors, angle = self.compute_hist(np.ravel(grad_x), np.ravel(grad_y))
+            if brief:
+                descriptors = self.brief(image, (x, y))
+            _descriptors.extend(desciptors)
+        if len(_descriptors) < clip:
+            _descriptors = np.pad(
+                _descriptors,
+                (0, clip - len(_descriptors)),
+                mode="constant",
+                constant_values=(0, 0),
+            ).tolist()
+        return _descriptors[:clip]
+
+    def process(
+        self,
+        append_value: int,
+        to_append: bool,
+        block: int = 8,
+        clip: int = 1000,
+        **kwargs,
+    ) -> list:
+        self.orb = []
+        threshold = kwargs.get("threshold", 40)
+        window_size = kwargs.get("window_size", 3)
+        for i, image in enumerate(self.images[:50]):
+            histogram = []
+            keypoints = self.fast(image, threshold, window_size)
+            descriptors = self.descriptors(image, keypoints, block, clip, brief=True)
+            histogram.extend(descriptors)
+            if to_append:
+                histogram.append(append_value)
+            self.orb.append(histogram)
+        return self.orb
 
 
 class Display:
@@ -291,7 +368,6 @@ class ImagePacker:
         _features = []
         append_label = kwargs.get("append_label", [])
         block_size = kwargs.get("block_size", 8)
-        add_image_location = kwargs.get("add_image_location", True)
         clip = kwargs.get("clip", 1000)
         value = 0
         to_append = False
@@ -302,9 +378,7 @@ class ImagePacker:
                 value = append_label[index]
             descriptor = cls(imageObj)
             _features.extend(
-                descriptor.process(
-                    add_image_location, value, to_append, block_size, clip
-                )
+                descriptor.process(value, to_append, block_size, clip, **kwargs)
             )
         return _features
 
@@ -324,13 +398,23 @@ class ImagePacker:
 
     def to_sift(self, **kwargs) -> pd.DataFrame | list:
         """
-        To compute Histogram of gradients of an image.
+        To compute SIFT descriptors of an image.
         :param imageObj: The image object that contains all the images to be converted to HOG features.
 
         :return: Returns list of HOG features of images.
         """
         sift = self.image_to_descriptor(self.data, SIFT, **kwargs)
         return sift
+
+    def to_orb(self, **kwargs) -> pd.DataFrame | list:
+        """
+        To compute ORB descriptors of an image.
+        :param imageObj: The image object that contains all the images to be converted to HOG features.
+
+        :return: Returns list of HOG features of images.
+        """
+        orb = self.image_to_descriptor(self.data, ORB, **kwargs)
+        return orb
 
     def descriptor_to_df(self, data, shuffle=True, target_col_name="target"):
         df = pd.DataFrame(data)
