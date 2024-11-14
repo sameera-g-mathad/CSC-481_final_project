@@ -96,7 +96,7 @@ class Descriptors:
             bin_number = int(direction[index] / bin_width)
             bin_number %= num_bins
             histogram[bin_number] += magnitude[index]
-        angle = int(np.argmax(histogram) * 10)
+        angle = int(np.argmax(histogram))
         return (self.normalize(histogram), angle)
 
     @abstractmethod
@@ -198,7 +198,7 @@ class SIFT(Descriptors):
     def detect_keypoints(self, blurred_images: list[np.ndarray], threshold=0.2):
         keypoints = []
         for index in range(1, len(blurred_images) - 1):
-            diff_of_grad_images = blurred_images[index + 1] - blurred_images[index - 1]
+            diff_of_grad_images = blurred_images[index] - blurred_images[index - 1]
             diff_of_grad = (diff_of_grad_images > threshold) | (
                 diff_of_grad_images < -threshold
             )
@@ -219,7 +219,12 @@ class SIFT(Descriptors):
             grad_x = np.gradient(window, axis=1)
             grad_y = np.gradient(window, axis=0)
             desciptors, angle = self.compute_hist(np.ravel(grad_x), np.ravel(grad_y))
-            _descriptors.extend(desciptors)
+            new_descriptor = []
+            for i in range(angle, len(desciptors)):
+                new_descriptor.append(desciptors[i])
+            for i in range(0, angle):
+                new_descriptor.append(desciptors[i])
+            _descriptors.extend(new_descriptor)
         if len(_descriptors) < clip:
             _descriptors = np.pad(
                 _descriptors,
