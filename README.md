@@ -6,11 +6,11 @@ This project explores the performance of three popular feature descriptors—His
 
 In this project, we implemented the following feature descriptors from scratch:
 
-HOG: Focuses on detecting edges and gradients, ideal for images with structured patterns.
+* HOG: Focuses on detecting edges and gradients, ideal for images with structured patterns.
 
-SIFT: Designed for scale and rotation invariance, known for its robustness in feature matching.
+* SIFT: Designed for scale and rotation invariance, known for its robustness in feature matching.
 
-ORB: Combines FAST for keypoint detection with BRIEF descriptors, optimized for speed and efficiency.
+* ORB: Combines FAST for keypoint detection with BRIEF descriptors, optimized for speed and efficiency.
 
 The project evaluates each descriptor across three different datasets:
 Buildings vs. Forests: Focuses on structured images with distinct edges.
